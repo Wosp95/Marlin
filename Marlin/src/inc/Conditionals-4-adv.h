@@ -105,7 +105,14 @@
   #endif
 #endif
 
-#if !(ANY(HAS_BED_PROBE, BACKLASH_GCODE) || (ENABLED(EXTENSIBLE_UI) && ANY(MESH_BED_LEVELING, AUTO_BED_LEVELING_UBL)))
+#if HAS_BED_PROBE
+  #ifndef Z_PROBE_FEEDRATE_SLOW
+    #define Z_PROBE_FEEDRATE_SLOW (4*60)
+  #endif
+  #ifndef Z_PROBE_FEEDRATE_FAST
+    #define Z_PROBE_FEEDRATE_FAST (Z_PROBE_FEEDRATE_SLOW / 2)
+  #endif
+#elif !(ANY(HAS_BED_PROBE, BACKLASH_GCODE) || ALL(EXTENSIBLE_UI, HAS_MESH))
   #undef Z_PROBE_FEEDRATE_FAST
   #undef Z_PROBE_FEEDRATE_SLOW
 #endif
@@ -363,6 +370,13 @@
   #if ANY(FTM_DIR_CHANGE_HOLD_X, FTM_DIR_CHANGE_HOLD_Y, FTM_DIR_CHANGE_HOLD_Z, FTM_DIR_CHANGE_HOLD_E)
     #define HAS_FTM_DIR_CHANGE_HOLD 1
   #endif
+  #if ANY(FTM_POLYS, FTM_CONSTANT_JOLT)
+    #define HAS_FTM_TRAJECTORY_SELECTION 1
+  #endif
+  // Default trajectory type when not explicitly set
+  #ifndef FTM_TRAJECTORY_TYPE
+    #define FTM_TRAJECTORY_TYPE TRAPEZOIDAL
+  #endif
 #endif
 
 // Standard Motion
@@ -376,6 +390,11 @@
   #undef INPUT_SHAPING_X
   #undef INPUT_SHAPING_Y
   #undef INPUT_SHAPING_Z
+#endif
+
+// Disallowed with no shaping
+#if NONE(INPUT_SHAPING_X, INPUT_SHAPING_Y, INPUT_SHAPING_Z)
+  #undef SHAPING_MENU
   #undef INPUT_SHAPING_E_SYNC
 #endif
 
@@ -403,7 +422,7 @@
   #define HAS_CLASSIC_E_JERK 1
 #endif
 // E jerk is derived from JD factors
-#if ALL(HAS_JUNCTION_DEVIATION, LIN_ADVANCE)
+#if HAS_JUNCTION_DEVIATION && ANY(LIN_ADVANCE, FTM_HAS_LIN_ADVANCE)
   #define HAS_LINEAR_E_JERK 1
 #endif
 
@@ -478,6 +497,11 @@
   #define TEMP_SENSOR_0_IS_AD8495 1
 #elif TEMP_SENSOR_0 == -1
   #define TEMP_SENSOR_0_IS_AD595 1
+#elif TEMP_SENSOR_0 == -18
+  #define HAS_ADS1118 1
+  #define TEMP_SENSOR_0_IS_ADS1118 1
+  #define TEMP_SENSOR_0_ADS_TMIN    0
+  #define TEMP_SENSOR_0_ADS_TMAX 1024
 #elif TEMP_SENSOR_0 > 0
   #define TEMP_SENSOR_0_IS_THERMISTOR 1
   #if TEMP_SENSOR_0 == 1000
@@ -521,6 +545,11 @@
   #define TEMP_SENSOR_1_IS_AD8495 1
 #elif TEMP_SENSOR_1 == -1
   #define TEMP_SENSOR_1_IS_AD595 1
+#elif TEMP_SENSOR_1 == -18
+  #define HAS_ADS1118 1
+  #define TEMP_SENSOR_1_IS_ADS1118 1
+  #define TEMP_SENSOR_1_ADS_TMIN    0
+  #define TEMP_SENSOR_1_ADS_TMAX 1024
 #elif TEMP_SENSOR_1 > 0
   #define TEMP_SENSOR_1_IS_THERMISTOR 1
   #if TEMP_SENSOR_1 == 1000
@@ -1528,6 +1557,20 @@
 // Flag whether least_squares_fit.cpp is used
 #if ANY(AUTO_BED_LEVELING_UBL, AUTO_BED_LEVELING_LINEAR, HAS_Z_STEPPER_ALIGN_STEPPER_XY)
   #define NEED_LSF 1
+#endif
+
+// Saving meshes to EEPROM?
+#if ALL(EEPROM_SETTINGS, HAS_MESH)
+  #ifndef MAX_SAVED_MESHES
+    #define MAX_SAVED_MESHES 100
+  #endif
+  #if MAX_SAVED_MESHES > 0
+    #define HAS_MESH_STORAGE 1
+  #endif
+#endif
+#if !HAS_MESH_STORAGE
+  #undef OPTIMIZED_MESH_STORAGE
+  #undef UBL_SAVE_ACTIVE_ON_M500
 #endif
 
 #if ALL(HAS_TFT_LVGL_UI, CUSTOM_MENU_MAIN)
