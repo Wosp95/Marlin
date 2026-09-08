@@ -199,6 +199,22 @@
     opacity: 0.6;
 }
 
+.testlevel-z-steps {
+    line-height: 1.55;
+    margin: 0 0 14px;
+    padding-left: 24px;
+}
+
+.testlevel-z-search-action {
+    line-height: 1.35;
+    min-height: 44px;
+    white-space: normal;
+}
+
+.testlevel-z-query-note p + p {
+    margin-top: 8px;
+}
+
 @media (max-width: 767px) {
     .testlevel-panel {
         padding: 12px 8px 24px;

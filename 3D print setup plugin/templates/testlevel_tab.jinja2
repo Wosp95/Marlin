@@ -189,21 +189,28 @@
 
     <section class="testlevel-card">
         <p class="testlevel-step-text">
-            Run a wide 5-square pass from <strong>-0.90</strong> to <strong>-0.50</strong>, pick the best square,
-            then refine around it with tighter spacing until one square is clearly best.
+            Use the test squares to find the first-layer height that gives a smooth, solid line without gaps or ridges.
         </p>
+        <ol class="testlevel-z-steps">
+            <li>Start with the wide pass from <strong>-0.90</strong> to <strong>-0.50</strong>.</li>
+            <li>Choose the square with the most even first layer.</li>
+            <li>Refine around that square, then apply the best offset.</li>
+        </ol>
 
         <div class="testlevel-note">
             <strong>Current printer baseline</strong>
-            <p data-bind="if: currentZBaseline() !== null, text: 'Live M851 Z offset: ' + currentZBaseline().toFixed(3)"></p>
-            <p data-bind="if: currentZBaseline() === null">The plugin will query M851 before it starts the next Z pass.</p>
+            <p data-bind="if: currentZBaseline() !== null, text: 'Live M851 Z offset: ' + currentZBaseline().toFixed(3) + ' mm'"></p>
+            <p data-bind="if: currentZBaseline() === null">No live baseline is loaded yet. Before every Z-offset pass, the plugin queries Marlin with M851 so the printed labels match the printer's current setting.</p>
         </div>
 
-        <button class="btn btn-primary btn-block" data-bind="click: startZSearch, enable: canStartZSearch(), text: zSearchButtonLabel"></button>
+        <button class="btn btn-primary btn-block testlevel-z-search-action" data-bind="click: startZSearch, enable: canStartZSearch(), attr: {title: zSearchButtonLabel}" type="button">
+            <span data-bind="text: zSearchButtonLabel, attr: {'aria-label': zSearchButtonLabel}"></span>
+        </button>
 
-        <div class="testlevel-note" data-bind="visible: isZCalibrationRunning()">
+        <div class="testlevel-note testlevel-z-query-note" data-bind="visible: isZCalibrationRunning()">
             <strong>Z pass in progress</strong>
-            <p>The plugin is either reading the live M851 baseline or printing the current 5-square pass. Do not start another pass until this finishes.</p>
+            <p data-bind="text: zSearchButtonLabel"></p>
+            <p>Do not start another pass until the current print finishes.</p>
         </div>
 
         <div class="testlevel-note" data-bind="if: zSearchState().status">
