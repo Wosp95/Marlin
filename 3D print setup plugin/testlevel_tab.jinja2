@@ -1,0 +1,89 @@
+<div id="tab_plugin_testlevel" class="testlevel-panel" data-bind="visible: loginState.isUser()">
+    <section class="testlevel-card testlevel-primary-card">
+        <button class="btn btn-primary btn-large btn-block" data-bind="click: startWorkflow, enable: !isSubmitting()">
+            <span data-bind="visible: !isSubmitting()">Run</span>
+            <span data-bind="visible: isSubmitting()">Sending...</span>
+        </button>
+
+        <button class="btn btn-danger btn-block" data-bind="click: abortWorkflow, enable: !isSubmitting() && state().stage !== 'idle'">
+            Abort
+        </button>
+
+        <p class="testlevel-status" data-bind="text: state().status"></p>
+        <p class="text-error testlevel-error" data-bind="visible: state().error, text: state().error"></p>
+
+        <div class="testlevel-note" data-bind="if: probeNoiseSummary()">
+            <strong data-bind="text: probeNoiseSummary().title"></strong>
+            <p data-bind="text: probeNoiseSummary().text"></p>
+        </div>
+    </section>
+
+    <section class="testlevel-card" data-bind="visible: guidedCorner() || state().assist">
+        <h3>Next Step</h3>
+
+        <div class="testlevel-note" data-bind="if: strategy()">
+            <strong>Tighten from the loose baseline</strong>
+            <p data-bind="text: 'Each wheel should tighten by at least ' + strategy().minimum_initial_tightening_turns.toFixed(2) + ' turns from the initial loose position on the first pass.'"></p>
+        </div>
+
+        <div data-bind="if: state().assist">
+            <p class="testlevel-step-label" data-bind="text: state().assist.label"></p>
+            <p class="testlevel-step-text" data-bind="text: state().assist.instruction || defaultGuidedInstruction()"></p>
+        </div>
+
+        <div data-bind="ifnot: state().assist">
+            <p class="testlevel-step-label" data-bind="text: guidedCorner() ? guidedCorner().label : ''"></p>
+            <p class="testlevel-step-text" data-bind="text: defaultGuidedInstruction()"></p>
+        </div>
+
+        <button class="btn btn-primary btn-block" data-bind="click: reprobe, enable: !isSubmitting() && (state().stage === 'guided' || state().stage === 'done')">
+            <span data-bind="visible: state().stage !== 'probing'">Re-probe all 5 points</span>
+            <span data-bind="visible: state().stage === 'probing'">Probing...</span>
+        </button>
+    </section>
+
+    <section class="testlevel-card">
+        <h3>Z Offset Search</h3>
+
+        <p class="testlevel-step-text">
+            Run a wide 5-square pass from <strong>-0.90</strong> to <strong>-0.50</strong>, pick the best square,
+            then refine around it with tighter spacing until one square is clearly best.
+        </p>
+
+        <div class="testlevel-note">
+            <strong>Current printer baseline</strong>
+            <p data-bind="if: currentZBaseline() !== null, text: 'Live M851 Z offset: ' + currentZBaseline().toFixed(3)"></p>
+            <p data-bind="if: currentZBaseline() === null">The plugin will query M851 before it starts the next Z pass.</p>
+        </div>
+
+        <button class="btn btn-primary btn-block" data-bind="click: startZSearch, enable: canStartZSearch(), text: zSearchButtonLabel"></button>
+
+        <div class="testlevel-note" data-bind="visible: isZCalibrationRunning()">
+            <strong>Z pass in progress</strong>
+            <p>The plugin is either reading the live M851 baseline or printing the current 5-square pass. Do not start another pass until this finishes.</p>
+        </div>
+
+        <div class="testlevel-note" data-bind="if: zSearchState().status">
+            <strong>Z search status</strong>
+            <p data-bind="text: zSearchState().status"></p>
+        </div>
+
+        <div class="testlevel-note" data-bind="visible: hasZCalibrationOffsets()">
+            <strong data-bind="text: zCalibration().center_offset !== null ? 'Current pass around Z ' + zCalibration().center_offset.toFixed(3) : 'Current pass'"></strong>
+            <p data-bind="text: zCalibration().step_mm !== null ? 'Square spacing: ' + zCalibration().step_mm.toFixed(3) + ' mm' : ''"></p>
+
+            <div class="testlevel-z-grid" data-bind="foreach: zCalibrationOffsets">
+                <div class="testlevel-z-card">
+                    <p class="testlevel-z-square" data-bind="text: 'Square ' + square"></p>
+                    <p class="testlevel-z-offset" data-bind="text: z_offset.toFixed(3) + ' mm'"></p>
+                    <button class="btn btn-small btn-primary" data-bind="click: $parent.refineZSearch, enable: !$parent.isSubmitting() && !$parent.isZCalibrationRunning()">
+                        Refine around this
+                    </button>
+                    <button class="btn btn-small" data-bind="click: $parent.applyZOffset, enable: !$parent.isSubmitting() && !$parent.isZCalibrationRunning()">
+                        Apply this
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>

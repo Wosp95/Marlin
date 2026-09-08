@@ -1,0 +1,232 @@
+<div id="tab_plugin_testlevel" class="testlevel-panel" data-bind="visible: loginState.isUser()">
+
+    <!-- ================================================================
+         SECTION 1: E-STEPS CALIBRATION
+         ================================================================ -->
+    <div class="testlevel-section-header">
+        <h2>1. E-Steps Calibration</h2>
+        <p class="testlevel-section-desc">Calibrate extruder steps/mm for accurate extrusion length. Run once per extruder.</p>
+    </div>
+
+    <section class="testlevel-card" id="esteps_section">
+        <div class="testlevel-note">
+            <strong>Prepare</strong>
+            <p>Load filament, then measure and cut (or mark) it at <strong>120mm</strong> above where it enters the extruder body.</p>
+        </div>
+
+        <h4 style="margin-top: 16px;">Heat &amp; Extrude</h4>
+        <p class="testlevel-step-text">
+            Homes the printer, raises Z to 100mm, heats to target, reads current E-steps,
+            then extrudes 100mm slowly. Hotend stays hot for re-runs.
+        </p>
+
+        <div class="control-group" style="margin-bottom: 12px;">
+            <label class="control-label">Hotend Temperature</label>
+            <div class="controls">
+                <div class="input-append">
+                    <input type="number" id="esteps_target_temp" value="200" min="170" max="280" class="input-small">
+                    <span class="add-on">&deg;C</span>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn btn-primary btn-large btn-block" id="esteps_btn_start">
+            Heat &amp; Extrude 100mm
+        </button>
+
+        <p id="esteps_progress" class="testlevel-status" style="display: none;">
+            <span id="esteps_progress_text"></span>
+        </p>
+
+        <h4 style="margin-top: 16px;">Measure &amp; Apply</h4>
+        <p class="testlevel-step-text">
+            Measure from your cut/mark to the extruder entry. Perfect = <strong>20mm</strong>.
+        </p>
+
+        <div class="control-group" style="margin-bottom: 12px;">
+            <label class="control-label">Remaining distance to mark</label>
+            <div class="controls">
+                <div class="input-append">
+                    <input type="number" id="esteps_measured" step="0.1" min="0" max="120" class="input-small" placeholder="e.g. 20">
+                    <span class="add-on">mm</span>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn btn-success btn-block" id="esteps_btn_done">
+            Calculate &amp; Apply
+        </button>
+
+        <div id="esteps_results" style="display: none; margin-top: 16px;">
+            <div class="testlevel-note">
+                <strong>Result</strong>
+                <table class="table table-condensed" style="width: auto; margin: 8px 0 0;">
+                    <tr><td>Actual extruded:</td><td id="res_actual" class="text-right"></td></tr>
+                    <tr><td>Error:</td><td id="res_pct_error" class="text-right"></td></tr>
+                    <tr><td>Previous E-steps:</td><td id="res_current" class="text-right"></td></tr>
+                    <tr><td><strong>New E-steps (applied):</strong></td><td id="res_new" class="text-right" style="font-weight: bold;"></td></tr>
+                </table>
+            </div>
+
+            <p id="esteps_result_status" class="testlevel-status" style="margin-top: 10px;"></p>
+
+            <button class="btn btn-danger btn-block" id="esteps_btn_save" style="margin-top: 10px;">
+                Save to EEPROM (permanent)
+            </button>
+            <button class="btn btn-block" id="esteps_btn_again" style="margin-top: 6px;">
+                Run Again to Verify
+            </button>
+        </div>
+    </section>
+
+    <!-- ================================================================
+         SECTION 2: PID TUNE
+         ================================================================ -->
+    <div class="testlevel-section-header">
+        <h2>2. PID Tune</h2>
+        <p class="testlevel-section-desc">Stabilize hotend temperature for consistent extrusion. Run once, or after hardware changes.</p>
+    </div>
+
+    <section class="testlevel-card" id="pid_section">
+        <p class="testlevel-step-text">
+            Cycles the hotend heater 8 times to find optimal PID values. Takes ~2 minutes.
+            The nozzle will heat and cool repeatedly &mdash; this is normal.
+        </p>
+
+        <div class="control-group" style="margin-bottom: 12px;">
+            <label class="control-label">Target Temperature (use your normal print temp)</label>
+            <div class="controls">
+                <div class="input-append">
+                    <input type="number" id="pid_target_temp" value="215" min="170" max="280" class="input-small">
+                    <span class="add-on">&deg;C</span>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn btn-primary btn-large btn-block" id="pid_btn_start">
+            Run PID Autotune
+        </button>
+
+        <p id="pid_progress" class="testlevel-status" style="display: none;">
+            <span id="pid_progress_text"></span>
+        </p>
+
+        <div id="pid_results" style="display: none; margin-top: 16px;">
+            <div class="testlevel-note">
+                <strong>Results</strong>
+                <table class="table table-condensed" style="width: auto; margin: 8px 0 0;">
+                    <tr><td>Kp:</td><td id="pid_kp" class="text-right"></td></tr>
+                    <tr><td>Ki:</td><td id="pid_ki" class="text-right"></td></tr>
+                    <tr><td>Kd:</td><td id="pid_kd" class="text-right"></td></tr>
+                </table>
+            </div>
+
+            <button class="btn btn-success btn-block" id="pid_btn_apply" style="margin-top: 10px;">
+                Apply &amp; Save to EEPROM
+            </button>
+            <p id="pid_apply_status" class="testlevel-status"></p>
+        </div>
+    </section>
+
+    <!-- ================================================================
+         SECTION 3: BED LEVELLING
+         ================================================================ -->
+    <div class="testlevel-section-header">
+        <h2>3. Bed Levelling</h2>
+        <p class="testlevel-section-desc">Probe corners and adjust bed wheels until the bed is parallel to the gantry.</p>
+    </div>
+
+    <section class="testlevel-card testlevel-primary-card">
+        <button class="btn btn-primary btn-large btn-block" data-bind="click: startWorkflow, enable: !isSubmitting()">
+            <span data-bind="visible: !isSubmitting()">Run Bed Level</span>
+            <span data-bind="visible: isSubmitting()">Sending...</span>
+        </button>
+
+        <button class="btn btn-danger btn-block" data-bind="click: abortWorkflow, enable: !isSubmitting() && state().stage !== 'idle'">
+            Abort
+        </button>
+
+        <p class="testlevel-status" data-bind="text: state().status"></p>
+        <p class="text-error testlevel-error" data-bind="visible: state().error, text: state().error"></p>
+
+        <div class="testlevel-note" data-bind="if: probeNoiseSummary()">
+            <strong data-bind="text: probeNoiseSummary().title"></strong>
+            <p data-bind="text: probeNoiseSummary().text"></p>
+        </div>
+    </section>
+
+    <section class="testlevel-card" data-bind="visible: guidedCorner() || state().assist">
+        <h3>Next Step</h3>
+
+        <div class="testlevel-note" data-bind="if: strategy()">
+            <strong>Tighten from the loose baseline</strong>
+            <p data-bind="text: 'Each wheel should tighten by at least ' + strategy().minimum_initial_tightening_turns.toFixed(2) + ' turns from the initial loose position on the first pass.'"></p>
+        </div>
+
+        <div data-bind="if: state().assist">
+            <p class="testlevel-step-label" data-bind="text: state().assist.label"></p>
+            <p class="testlevel-step-text" data-bind="text: state().assist.instruction || defaultGuidedInstruction()"></p>
+        </div>
+
+        <div data-bind="ifnot: state().assist">
+            <p class="testlevel-step-label" data-bind="text: guidedCorner() ? guidedCorner().label : ''"></p>
+            <p class="testlevel-step-text" data-bind="text: defaultGuidedInstruction()"></p>
+        </div>
+
+        <button class="btn btn-primary btn-block" data-bind="click: reprobe, enable: !isSubmitting() && (state().stage === 'guided' || state().stage === 'done')">
+            <span data-bind="visible: state().stage !== 'probing'">Re-probe all 5 points</span>
+            <span data-bind="visible: state().stage === 'probing'">Probing...</span>
+        </button>
+    </section>
+
+    <!-- ================================================================
+         SECTION 3: Z-OFFSET
+         ================================================================ -->
+    <div class="testlevel-section-header">
+        <h2>4. Z-Offset</h2>
+        <p class="testlevel-section-desc">Find the perfect nozzle-to-bed distance using test squares.</p>
+    </div>
+
+    <section class="testlevel-card">
+        <p class="testlevel-step-text">
+            Run a wide 5-square pass from <strong>-0.90</strong> to <strong>-0.50</strong>, pick the best square,
+            then refine around it with tighter spacing until one square is clearly best.
+        </p>
+
+        <div class="testlevel-note">
+            <strong>Current printer baseline</strong>
+            <p data-bind="if: currentZBaseline() !== null, text: 'Live M851 Z offset: ' + currentZBaseline().toFixed(3)"></p>
+            <p data-bind="if: currentZBaseline() === null">The plugin will query M851 before it starts the next Z pass.</p>
+        </div>
+
+        <button class="btn btn-primary btn-block" data-bind="click: startZSearch, enable: canStartZSearch(), text: zSearchButtonLabel"></button>
+
+        <div class="testlevel-note" data-bind="visible: isZCalibrationRunning()">
+            <strong>Z pass in progress</strong>
+            <p>The plugin is either reading the live M851 baseline or printing the current 5-square pass. Do not start another pass until this finishes.</p>
+        </div>
+
+        <div class="testlevel-note" data-bind="if: zSearchState().status">
+            <strong>Z search status</strong>
+            <p data-bind="text: zSearchState().status"></p>
+        </div>
+
+        <div class="testlevel-note" data-bind="visible: hasZCalibrationOffsets()">
+            <strong data-bind="text: zCalibration().center_offset !== null ? 'Current pass around Z ' + zCalibration().center_offset.toFixed(3) : 'Current pass'"></strong>
+            <p data-bind="text: zCalibration().step_mm !== null ? 'Square spacing: ' + zCalibration().step_mm.toFixed(3) + ' mm' : ''"></p>
+
+            <div class="testlevel-z-grid" data-bind="foreach: zCalibrationOffsets">
+                <div class="testlevel-z-card">
+                    <p class="testlevel-z-square" data-bind="text: 'Square ' + square"></p>
+                    <p class="testlevel-z-offset" data-bind="text: z_offset.toFixed(3) + ' mm'"></p>
+                    <button class="btn btn-small btn-primary" data-bind="click: $parent.refineZSearch, enable: !$parent.isSubmitting() && !$parent.isZCalibrationRunning()">
+                        Refine around this
+                    </button>
+                    <button class="btn btn-small" data-bind="click: $parent.applyZOffset, enable: !$parent.isSubmitting() && !$parent.isZCalibrationRunning()">
+                        Apply this
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>

@@ -1,0 +1,234 @@
+.testlevel-panel {
+    box-sizing: border-box;
+    margin: 0 auto;
+    max-width: 1120px;
+    padding: 16px 20px 32px;
+}
+
+.testlevel-hero {
+    margin-bottom: 20px;
+}
+
+.testlevel-hero h2 {
+    margin: 0 0 8px;
+}
+
+.testlevel-hero p {
+    color: #666;
+    margin: 0;
+}
+
+.testlevel-grid {
+    display: grid;
+    gap: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    margin-bottom: 20px;
+}
+
+.testlevel-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    padding: 16px 18px;
+}
+
+.testlevel-card h3 {
+    margin-top: 0;
+}
+
+.testlevel-primary-card {
+    max-width: 720px;
+}
+
+.testlevel-status {
+    font-size: 15px;
+    line-height: 1.5;
+    margin: 14px 0 0;
+}
+
+.testlevel-error {
+    margin-top: 10px;
+}
+
+.testlevel-note {
+    background: #f7f9fc;
+    border: 1px solid #dbe4ef;
+    border-radius: 6px;
+    margin-top: 14px;
+    padding: 12px 14px;
+}
+
+.testlevel-note p {
+    margin: 6px 0 0;
+}
+
+.testlevel-step-label {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 8px;
+}
+
+.testlevel-step-text {
+    line-height: 1.6;
+    margin-bottom: 14px;
+}
+
+.testlevel-guide-card {
+    background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+    border-color: #c7d8ea;
+}
+
+.testlevel-guide-meta {
+    color: #5b6b7d;
+    margin-bottom: 12px;
+}
+
+.testlevel-instruction {
+    color: #334155;
+    line-height: 1.5;
+    margin: 10px 0 0;
+}
+
+.testlevel-badge {
+    background: #e6f0fb;
+    border-radius: 999px;
+    color: #24517a;
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 8px;
+    padding: 2px 8px;
+    text-transform: uppercase;
+}
+
+.testlevel-cell-note {
+    color: #5b6b7d;
+    font-size: 12px;
+    line-height: 1.4;
+    margin-top: 4px;
+}
+
+.testlevel-feedback {
+    border-radius: 6px;
+    margin: 12px 0;
+    padding: 10px 12px;
+}
+
+.testlevel-feedback strong {
+    display: block;
+    margin-bottom: 4px;
+}
+
+.testlevel-feedback p {
+    margin: 0;
+}
+
+.testlevel-feedback.is-initial,
+.testlevel-feedback.is-same {
+    background: #f4f7fb;
+    border-left: 4px solid #7a8aa0;
+}
+
+.testlevel-feedback.is-better {
+    background: #eef8f0;
+    border-left: 4px solid #3c8c4a;
+}
+
+.testlevel-feedback.is-success {
+    background: #e9f8ec;
+    border-left: 4px solid #2f9a44;
+}
+
+.testlevel-feedback.is-wrong_way,
+.testlevel-feedback.is-overshot {
+    background: #fff3e8;
+    border-left: 4px solid #d97706;
+}
+
+.testlevel-actions {
+    display: block;
+    margin-bottom: 12px;
+}
+
+.testlevel-actions .btn + .btn {
+    margin-top: 8px;
+}
+
+.testlevel-card .btn + .btn {
+    margin-left: 8px;
+}
+
+.testlevel-limit-button {
+    margin-top: 8px;
+}
+
+.testlevel-z-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    margin-top: 12px;
+}
+
+.testlevel-z-card {
+    background: #f8fbff;
+    border: 1px solid #dbe4ef;
+    border-radius: 6px;
+    padding: 12px;
+}
+
+.testlevel-z-square {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 4px;
+}
+
+.testlevel-z-offset {
+    color: #334155;
+    margin: 0 0 10px;
+}
+
+.testlevel-z-card .btn {
+    display: block;
+    margin-top: 8px;
+    width: 100%;
+}
+
+.testlevel-z-card .btn[disabled] {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+@media (max-width: 767px) {
+    .testlevel-panel {
+        padding: 12px 8px 24px;
+    }
+
+    .testlevel-card .btn + .btn {
+        margin-left: 0;
+        margin-top: 8px;
+    }
+}
+.testlevel-section-header {
+    margin-top: 32px;
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #dbe4ef;
+}
+
+.testlevel-section-header:first-child {
+    margin-top: 0;
+}
+
+.testlevel-section-header h2 {
+    margin: 0 0 4px;
+    font-size: 20px;
+    font-weight: 600;
+    color: #24517a;
+}
+
+.testlevel-section-desc {
+    color: #5b6b7d;
+    font-size: 14px;
+    margin: 0;
+}

@@ -1,0 +1,80 @@
+<div id="tab_plugin_testlevel_esteps" class="testlevel-panel">
+    <section class="testlevel-card testlevel-primary-card">
+        <h3>E-Steps Calibration</h3>
+        <p class="testlevel-step-text">Calibrate extruder steps/mm for accurate extrusion length.</p>
+
+        <div class="testlevel-note">
+            <strong>1. Prepare Filament</strong>
+            <p>Load filament, then measure and cut (or mark) it at <strong>120mm</strong> above where it enters the extruder body.</p>
+        </div>
+    </section>
+
+    <section class="testlevel-card">
+        <h3>2. Heat &amp; Extrude</h3>
+        <p class="testlevel-step-text">
+            Homes the printer, raises Z to 100mm, heats to target temperature, reads current E-steps,
+            then extrudes 100mm slowly. The hotend stays hot so you can re-run immediately.
+        </p>
+
+        <div class="control-group" style="margin-bottom: 12px;">
+            <label class="control-label">Hotend Temperature</label>
+            <div class="controls">
+                <div class="input-append">
+                    <input type="number" id="esteps_target_temp" value="200" min="170" max="280" class="input-small">
+                    <span class="add-on">&deg;C</span>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn btn-primary btn-large btn-block" id="esteps_btn_start">
+            Heat &amp; Extrude 100mm
+        </button>
+
+        <p id="esteps_progress" class="testlevel-status" style="display: none;">
+            <span id="esteps_progress_text"></span>
+        </p>
+    </section>
+
+    <section class="testlevel-card">
+        <h3>3. Measure &amp; Apply</h3>
+        <p class="testlevel-step-text">
+            Measure the remaining distance from your cut/mark to the extruder entry.
+            If the extrusion was perfect, this should be exactly <strong>20mm</strong>.
+        </p>
+
+        <div class="control-group" style="margin-bottom: 12px;">
+            <label class="control-label">Remaining distance to mark</label>
+            <div class="controls">
+                <div class="input-append">
+                    <input type="number" id="esteps_measured" step="0.1" min="0" max="120" class="input-small" placeholder="e.g. 20">
+                    <span class="add-on">mm</span>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn btn-success btn-block" id="esteps_btn_done">
+            Calculate &amp; Apply
+        </button>
+
+        <div id="esteps_results" style="display: none; margin-top: 16px;">
+            <div class="testlevel-note">
+                <strong>Result</strong>
+                <table class="table table-condensed" style="width: auto; margin: 8px 0 0;">
+                    <tr><td>Actual extruded:</td><td id="res_actual" class="text-right"></td></tr>
+                    <tr><td>Error:</td><td id="res_pct_error" class="text-right"></td></tr>
+                    <tr><td>Previous E-steps:</td><td id="res_current" class="text-right"></td></tr>
+                    <tr><td><strong>New E-steps (applied):</strong></td><td id="res_new" class="text-right" style="font-weight: bold;"></td></tr>
+                </table>
+            </div>
+
+            <p id="esteps_result_status" class="testlevel-status" style="margin-top: 10px;"></p>
+
+            <button class="btn btn-danger btn-block" id="esteps_btn_save" style="margin-top: 10px;">
+                Save to EEPROM (permanent)
+            </button>
+            <button class="btn btn-block" id="esteps_btn_again" style="margin-top: 6px;">
+                Run Again to Verify
+            </button>
+        </div>
+    </section>
+</div>
