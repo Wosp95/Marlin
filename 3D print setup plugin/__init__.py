@@ -86,9 +86,10 @@ class TestLevelPlugin(
             "screw_pitch_mm": 0.7,
             "minimum_initial_tightening_turns": 0.0,
             "tolerance_mm": 0.03,
-            # Stock Ender 3 / Pro / V2 bed is 235 x 235.
-            "bed_size_x_mm": 235.0,
-            "bed_size_y_mm": 235.0,
+            # Marlin's configured printable/travel envelope for this printer.
+            # The glass is physically larger, but firmware is limited to 220 x 220.
+            "bed_size_x_mm": 220.0,
+            "bed_size_y_mm": 220.0,
             # Probe tip should land above the bed screws. On stock Ender 3 Pro
             # the screws are approximately 32 mm in from each edge, but bed
             # clips can extend further. Use 40 mm to stay clear of clips.
@@ -131,9 +132,9 @@ class TestLevelPlugin(
             # When True, run a full mesh probe (G29) after all corners are
             # within tolerance so firmware mesh compensation is up to date.
             "auto_mesh_on_done": True,
-            # Inset from bed edges for the G29 mesh probe grid (probe-tip coordinates).
-            # Keeps the mesh away from bed clips. Use a value >= corner_inset_mm.
-            "mesh_inset_mm": 40.0,
+            # Keep the mesh clear of the front and rear clips by 10 mm.
+            "probing_margin_mm": 10.0,
+            "mesh_inset_mm": 10.0,
         }
 
     def get_assets(self):
@@ -1067,25 +1068,14 @@ class TestLevelPlugin(
         offset_x = self._probe_offset_x_mm if self._probe_offset_x_mm is not None else 0.0
         offset_y = self._probe_offset_y_mm if self._probe_offset_y_mm is not None else 0.0
 
-        # Keep the probe well inside the firmware's right-edge probe boundary.
-        # Live serial-log checks on this printer showed:
-        #   - G30 X180 Y25 -> "Z Probe Past Bed"
-        #   - G30 X170 Y25 -> success
-        # with M851 X-45 Y-6.5. That means the safe right-side nozzle ceiling
-        # is about 20 mm inside the nominal 235 mm travel max.
-        # Apply the same margin on Y to keep rear points within the firmware
-        # probe area.
-        nozzle_edge_margin_x_mm = 20.0
-        nozzle_edge_margin_y_mm = 20.0
-
         return compute_probe_points(
             bed_size_x_mm=bed_x,
             bed_size_y_mm=bed_y,
             corner_inset_mm=inset,
             probe_offset_x_mm=offset_x,
             probe_offset_y_mm=offset_y,
-            nozzle_max_x_mm=bed_x - nozzle_edge_margin_x_mm,
-            nozzle_max_y_mm=bed_y - nozzle_edge_margin_y_mm,
+            nozzle_max_x_mm=bed_x,
+            nozzle_max_y_mm=bed_y,
             explicit_probe_targets=self._configured_probe_targets(),
         )
 
@@ -1110,25 +1100,27 @@ class TestLevelPlugin(
         bed_x = self._settings.get_float(["bed_size_x_mm"])
         bed_y = self._settings.get_float(["bed_size_y_mm"])
         inset = self._settings.get_float(["mesh_inset_mm"])
+        probing_margin = self._settings.get_float(["probing_margin_mm"])
 
         # Probe-tip boundaries
-        front = inset
-        back = bed_y - inset
-        left = inset
-        right = bed_x - inset
+        front = max(inset, probing_margin)
+        back = min(bed_y - inset, bed_y - probing_margin)
+        left = max(inset, probing_margin)
+        right = min(bed_x - inset, bed_x - probing_margin)
 
-        # Apply the same right-side clamp the plugin uses for corner probes.
-        # With M851 X-45, probe_x = nozzle_x + offset_x, and nozzle travel is
-        # limited. The plugin already proved that probe_x=170 is the safe max.
-        nozzle_edge_margin_x_mm = 20.0
+        # Account for the probe offset and the configured 220 mm nozzle travel
+        # envelope. With M851 X-45, the probe cannot reach farther right than
+        # X=175 even though the glass extends beyond the printable envelope.
         offset_x = self._probe_offset_x_mm if self._probe_offset_x_mm is not None else 0.0
-        max_probe_x = bed_x - nozzle_edge_margin_x_mm + offset_x
-        if right > max_probe_x:
-            right = max_probe_x
+        offset_y = self._probe_offset_y_mm if self._probe_offset_y_mm is not None else 0.0
+        right = min(right, bed_x + offset_x)
+        back = min(back, bed_y + offset_y)
+        left = max(left, probing_margin, offset_x)
+        front = max(front, probing_margin, offset_y)
 
         self._logger.info(
-            "G29 mesh boundaries: L=%.1f R=%.1f F=%.1f B=%.1f (inset=%.1f offset_x=%.1f)",
-            left, right, front, back, inset, offset_x,
+            "G29 mesh boundaries: L=%.1f R=%.1f F=%.1f B=%.1f (inset=%.1f margin=%.1f offsets=%.1f,%.1f)",
+            left, right, front, back, inset, probing_margin, offset_x, offset_y,
         )
         return f"G29 L{left:.0f} R{right:.0f} F{front:.0f} B{back:.0f}"
 
