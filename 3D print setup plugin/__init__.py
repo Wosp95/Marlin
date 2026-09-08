@@ -805,6 +805,10 @@ class TestLevelPlugin(
         }
 
     def _handle_apply_z_offset(self, data):
+        error_response = self._ensure_printer_ready()
+        if error_response is not None:
+            return error_response
+
         square = self._parse_square_choice(data)
         if isinstance(square, tuple):
             return square
@@ -1840,7 +1844,20 @@ class TestLevelPlugin(
 
     def _handle_pid_start(self, data):
         """Start PID autotune at the given temperature."""
-        temp = int(data.get("target_temp", 215))
+        error_response = self._ensure_printer_ready()
+        if error_response is not None:
+            return error_response
+
+        if self._pid_running:
+            return flask.jsonify({"ok": False, "error": "PID autotune is already running"}), 409
+
+        try:
+            temp = int((data or {}).get("target_temp", 215))
+        except (TypeError, ValueError):
+            return flask.jsonify({"ok": False, "error": "target_temp must be a whole number"}), 400
+        if temp < 1 or temp > 300:
+            return flask.jsonify({"ok": False, "error": "target_temp must be between 1 and 300C"}), 400
+
         self._pid_running = True
         self._pid_results = None
         self._printer.commands(["M303 E0 S{} C8".format(temp)])
@@ -1852,6 +1869,10 @@ class TestLevelPlugin(
 
     def _handle_pid_apply(self):
         """Apply PID results via M301 and save to EEPROM."""
+        error_response = self._ensure_printer_ready()
+        if error_response is not None:
+            return error_response
+
         if self._pid_results is None:
             return flask.jsonify({"error": "No PID results available. Run autotune first."}), 400
         kp = self._pid_results["kp"]
@@ -1911,7 +1932,20 @@ class TestLevelPlugin(
 
     def _handle_esteps_start(self, data):
         """Single command: read E-steps, heat to temp (blocking), then extrude 100mm."""
-        temp = int(data.get("target_temp", 200))
+        error_response = self._ensure_printer_ready()
+        if error_response is not None:
+            return error_response
+
+        if self._esteps_waiting:
+            return flask.jsonify({"ok": False, "error": "E-steps calibration is already running"}), 409
+
+        try:
+            temp = int((data or {}).get("target_temp", 200))
+        except (TypeError, ValueError):
+            return flask.jsonify({"ok": False, "error": "target_temp must be a whole number"}), 400
+        if temp < 1 or temp > 300:
+            return flask.jsonify({"ok": False, "error": "target_temp must be between 1 and 300C"}), 400
+
         self._esteps_target_temp = temp
         self._esteps_waiting = True
         self._esteps_current = None
@@ -1939,7 +1973,17 @@ class TestLevelPlugin(
 
     def _handle_esteps_calculate_and_apply(self, data):
         """Calculate new E-steps from measurement and immediately apply via M92."""
-        measured_remaining = float(data.get("measured_remaining", 0))
+        error_response = self._ensure_printer_ready()
+        if error_response is not None:
+            return error_response
+
+        try:
+            measured_remaining = float((data or {}).get("measured_remaining", 0))
+        except (TypeError, ValueError):
+            return flask.jsonify({"error": "measured_remaining must be a number"}), 400
+        if not math.isfinite(measured_remaining) or not 0 <= measured_remaining <= 120:
+            return flask.jsonify({"error": "measured_remaining must be between 0 and 120 mm"}), 400
+
         mark_distance = 120
         extrude_length = 100
         actual_extruded = mark_distance - measured_remaining
@@ -1960,6 +2004,10 @@ class TestLevelPlugin(
         return flask.jsonify(result)
 
     def _handle_esteps_save(self):
+        error_response = self._ensure_printer_ready()
+        if error_response is not None:
+            return error_response
+
         self._printer.commands(["M500"])
         return flask.jsonify({"status": "saved"})
 
