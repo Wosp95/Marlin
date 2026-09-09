@@ -60,7 +60,7 @@ def main():
     time.sleep(2)
     check_sd_card(args.port, args.baud)
 
-    target = "fw-" + Path(args.firmware).stem[-5:] + ".BIN"
+    target = "firmware.bin"
     protocol = None
     try:
         protocol = Protocol(args.port, args.baud, 512, 0.0, 1000)
