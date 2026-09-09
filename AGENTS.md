@@ -220,6 +220,38 @@ platformio run --silent -e STM32F103RE_creality
 
 `git clean -fdx` removes ignored build artifacts, caches, logs, and generated files; it does not remove tracked modifications. Do not run concurrent PlatformIO environments while rebuilding the target.
 
+#### Repeatable Windows Build and Troubleshooting
+
+Use the repository wrapper for the configured Creality V4.2.7 target:
+
+```powershell
+.\buildroot\bin\build_firmware.ps1
+```
+
+If Windows blocks local PowerShell scripts because of the execution policy, use a process-scoped bypass without changing the machine policy:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\buildroot\bin\build_firmware.ps1
+```
+
+The wrapper prefers Auto Build Marlin's managed PlatformIO Core at `%USERPROFILE%\.platformio\penv\Scripts\platformio.exe`, then falls back to `platformio` on `PATH` and the user Python installation. It creates a temporary `.octoprint_run.lock`, refuses to overlap another PlatformIO/SCons build, builds `STM32F103RE_creality`, and prints the newest firmware filename, size, and SHA256. It does not upload or flash firmware.
+
+If the build reports a missing `.sconsign311.dblite`, a missing target directory, or another stale generated-state error, first preserve any intended untracked files and then run the explicit recovery mode:
+
+```powershell
+.\buildroot\bin\build_firmware.ps1 -RecoverStale
+```
+
+Recovery runs `git clean -fdx` and retries once. This removes ignored PlatformIO state, caches, logs, and generated files, but does not remove tracked modifications. Do not use recovery while Auto Build Marlin or another PlatformIO process is still running. If recovery is not appropriate, run the normal build again after closing the competing process.
+
+Known observations from the Windows build investigation:
+
+- Auto Build Marlin used PlatformIO Core `6.1.19`; the standalone user installation was `6.2.0`. Mixing them can produce different package state, so use one executable for a build and prefer the managed executable for UI-equivalent results.
+- The resolved STM32 platform was `ststm32@12.1.1`, with SCons `4.11.1` (`tool-scons@4.41101.0`). A SCons message that a source is `obsolete` is a warning; judge success by the process exit code and a generated `.bin`, not that message alone.
+- `buildroot/bin/mftest --autobuild --silent` is the Marlin helper path, but it requires Bash and `pio` on `PATH`. When it presents the detected `CREALITY_V427 (5042)` menu, select `STM32F103RE_creality`.
+- A successful build can leave several timestamped `.bin` files in `.pio/build/STM32F103RE_creality`; select the newest file and verify its hash. Different hashes may reflect separate builds and do not by themselves indicate failure.
+- A successful compile is not a deployment. Verify the physical board, source/configuration state, artifact hash, rollback artifact, and printer idle state before any SD-card flash or reboot. Require explicit confirmation immediately before deployment.
+
 ### 6.2 Configuration System
 
 Configuration is managed through a layered preprocessor conditional system:
