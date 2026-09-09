@@ -209,6 +209,17 @@ Marlin uses PlatformIO as its primary build system, configured via `platformio.i
 - **Include directory**: `Marlin/src/`
 - **Board definitions**: Custom PlatformIO board definitions in `buildroot/share/PlatformIO/boards/`
 
+#### Recovering Stale PlatformIO State
+
+On Windows, a stale or corrupted PlatformIO build tree can make a valid target fail with a missing `.sconsign311.dblite` file. After confirming and preserving any intended tracked changes, clean generated state with:
+
+```powershell
+git clean -fdx
+platformio run --silent -e STM32F103RE_creality
+```
+
+`git clean -fdx` removes ignored build artifacts, caches, logs, and generated files; it does not remove tracked modifications. Do not run concurrent PlatformIO environments while rebuilding the target.
+
 ### 6.2 Configuration System
 
 Configuration is managed through a layered preprocessor conditional system:
