@@ -39,8 +39,9 @@ def read_api_key(config_path):
 
 def check_sd_card(port_name, baud):
     with serial.Serial(port_name, baudrate=baud, timeout=0.2, write_timeout=1) as port:
-        port.write(b"M21\n")
-        deadline = time.time() + 3
+        port.reset_input_buffer()
+        port.write(b"M21\r\n")
+        deadline = time.time() + 8
         response = ""
         while time.time() < deadline:
             response += port.read(port.in_waiting or 1).decode("utf-8", "replace")
@@ -50,22 +51,52 @@ def check_sd_card(port_name, baud):
         raise RuntimeError(f"SD card check failed: {response.strip()}")
 
 
-def check_firmware_file(port_name, baud):
+def check_firmware_file(port_name, baud, filename):
     with serial.Serial(port_name, baudrate=baud, timeout=0.2, write_timeout=1) as port:
-        port.write(b"M20\n")
-        deadline = time.time() + 3
+        port.reset_input_buffer()
+        port.write(b"M20\r\n")
+        deadline = time.time() + 8
         response = ""
         while time.time() < deadline:
             response += port.read(port.in_waiting or 1).decode("utf-8", "replace")
             if "End file list" in response or "SD Card Init Fail" in response:
                 break
-    if TARGET_FILENAME.lower() not in response.lower():
-        raise RuntimeError(f"{TARGET_FILENAME} was not listed on the SD card: {response.strip()}")
+    if filename.lower() not in response.lower():
+        raise RuntimeError(f"{filename} was not listed on the SD card: {response.strip()}")
 
 
 def send_command(port_name, baud, command):
     with serial.Serial(port_name, baudrate=baud, timeout=0.2, write_timeout=1) as port:
         port.write(f"{command}\n".encode("ascii"))
+
+
+def remove_firmware_files(port_name, baud):
+    with serial.Serial(port_name, baudrate=baud, timeout=0.2, write_timeout=1) as port:
+        port.write(b"M20 F\n")
+        deadline = time.time() + 8
+        response = ""
+        while time.time() < deadline:
+            response += port.read(port.in_waiting or 1).decode("utf-8", "replace")
+            if "End file list" in response or "SD Card Init Fail" in response:
+                break
+        if "End file list" not in response:
+            raise RuntimeError(f"SD card listing failed: {response.strip()}")
+        filenames = []
+        for line in response.splitlines():
+            match = re.search(r"(?:^|\s)([^/\s]+\.BIN)(?:\s|$)", line, re.IGNORECASE)
+            if match:
+                filenames.append(match.group(1))
+        for filename in filenames:
+            port.reset_input_buffer()
+            port.write(f"M30 /{filename}\n".encode("ascii"))
+            deadline = time.time() + 3
+            delete_response = ""
+            while time.time() < deadline:
+                delete_response += port.read(port.in_waiting or 1).decode("utf-8", "replace")
+                if "File deleted" in delete_response or "not found" in delete_response.lower():
+                    break
+            if "File deleted" not in delete_response and "not found" not in delete_response.lower():
+                raise RuntimeError(f"Firmware file '{filename}' was not removed: {delete_response.strip()}")
 
 
 def main():
@@ -76,8 +107,10 @@ def main():
     parser.add_argument("--octoprint-config", default="/home/kieran/.octoprint/config.yaml")
     parser.add_argument("--log", default="/home/kieran/.octoprint/logs/octoprint.log")
     parser.add_argument("--timeout", type=int, default=90)
+    parser.add_argument("--target", default=TARGET_FILENAME)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
+    target_filename = args.target
 
     firmware = Path(args.firmware)
     if not firmware.is_file():
@@ -91,22 +124,23 @@ def main():
     api_request(api_key, "connection", {"command": "disconnect"})
     protocol = None
     try:
-        time.sleep(2)
+        time.sleep(4)
         check_sd_card(args.port, args.baud)
+        remove_firmware_files(args.port, args.baud)
         protocol = Protocol(args.port, args.baud, 512, 0.0, 1000)
         protocol.connect()
         transfer = FileTransferProtocol(protocol)
-        if not transfer.copy(str(firmware), TARGET_FILENAME, True, False):
+        if not transfer.copy(str(firmware), target_filename, True, False):
             raise RuntimeError("binary transfer failed")
         protocol.disconnect()
         protocol.shutdown()
         protocol = None
-        if not args.dry_run:
-            check_firmware_file(args.port, args.baud)
         send_command(args.port, args.baud, "M21")
         if not args.dry_run:
+            check_firmware_file(args.port, args.baud, target_filename)
+        if not args.dry_run:
             send_command(args.port, args.baud, "M997")
-        print(json.dumps({"transfer": "ok", "target": TARGET_FILENAME, "dry_run": args.dry_run}))
+        print(json.dumps({"transfer": "ok", "target": target_filename, "dry_run": args.dry_run}))
     finally:
         if protocol:
             protocol.shutdown()

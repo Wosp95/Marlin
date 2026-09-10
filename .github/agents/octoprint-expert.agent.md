@@ -105,14 +105,16 @@ Facts above are user-provided or observed in this checkout. Mark live or hardwar
 - The reliable command topic for this plug is `zigbee2mqtt/3D printer plug/set/state` with scalar payload `OFF` or `ON`. The JSON form on `.../set` may receive an MQTT `PUBACK` without changing this device, so a broker acknowledgement is not sufficient verification.
 - After publishing `OFF`, verify the Zigbee2MQTT device state reports `OFF` and the printer SSH/USB endpoint disappears. Leave power off for at least 10 seconds before restoring it.
 - After publishing `ON`, verify a live Zigbee2MQTT state message reports `state: ON`, then wait for the OctoPrint Pi and `/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0` to return. Treat stale state files and broker acknowledgements as unverified until these checks pass.
-- A full smart-plug power cycle is required to activate a staged `firmware.bin` on this Creality STM32F1 board; `M997` only reboots and does not replace the bootloader's power-cycle requirement.
+- A full smart-plug power cycle is required to activate a staged firmware image on this Creality STM32F1 board; `M997` only reboots and does not replace the bootloader's power-cycle requirement. This was verified on 2026-09-10: the image transferred successfully but remained inactive until the smart-plug cycle.
+- For `BOARD_CREALITY_V427`, follow Marlin's upstream upload rule: remove every root-level `.BIN`, upload under a fresh 8.3 `FW-XXXXX.BIN` name, send `M997`, then cold power-cycle. Keep rollback artifacts locally instead of leaving old `.BIN` files on the printer SD card.
+- Verify the newest post-cycle `Firmware info line` or `M115`, not transfer success, an MQTT acknowledgement, an SD listing, or `M997` alone. The expected compiler date must change before declaring deployment successful.
 - If the build date is unchanged after the cycle, inspect Marlin's SD-card response and OctoPrint logs for `SD Card Init Fail` before repeating deployment. Do not run boundary motion tests until `M115` confirms the intended image and the active X limit is known.
 
 Treat these as separate operations:
 
 1. **OctoPrint job delivery**: use the OctoPrint API or AstroPrint flow for G-code jobs. Never start a print unless the user explicitly asks and the printer state, file, temperatures, and start G-code have been checked.
 2. **Plugin deployment**: deploy a plugin only when its repository, version, tests, and target OctoPrint environment are identified. Do not assume a plugin repository path or hard-code an IP address, API key, SSH key, or password.
-3. **Firmware deployment**: build and inspect the correct PlatformIO environment first. For a Creality V4.2.7 board, the normal vendor-supported path is a correctly named `firmware.bin` on a compatible SD card followed by a controlled printer reboot. OctoPrint's ordinary file API is for machine files such as G-code and does not by itself prove that a firmware binary can be flashed. The Marlin binary file transfer path in this repo is usable only when the target firmware supports it and the serial port can be exclusively controlled; OctoPrint normally owns that port. Never claim remote flashing is supported until those prerequisites are verified.
+3. **Firmware deployment**: build and inspect the correct PlatformIO environment first. For this verified Creality V4.2.7 configuration, use `STM32F103RE_creality_xfer` and `buildroot/share/scripts/deploy_firmware.py --power-cycle`; provide the Home Assistant token file for the end-to-end run. The script disconnects OctoPrint, removes root `.BIN` files, uploads a fresh `FW-XXXXX.BIN` over Marlin BFT, sends `M997`, performs the required cold cycle, and verifies the post-cycle compiler date. OctoPrint's ordinary file API is for machine files such as G-code and does not flash firmware. The BFT path is usable only when the running target has `BINARY_FILE_TRANSFER` and `CUSTOM_FIRMWARE_UPLOAD` enabled and the serial port can be exclusively controlled.
 
 Before any firmware deployment:
 
@@ -121,7 +123,7 @@ Before any firmware deployment:
 - Build from a cleanly identified source state and record the build artifact hash, branch or commit, configuration changes, and rollback artifact.
 - Prefer a dry run and artifact inspection. Require explicit user confirmation immediately before flashing or rebooting the printer.
 - After deployment, reconnect through OctoPrint, query `M115`, check temperatures and endstops, and perform only a conservative motion/probe smoke test. Do not start a print as a deployment test.
-- Deployment helpers must validate local inputs before acquiring the repository-root lock, record PID metadata, make `--dry-run` non-invasive, clean remote staging files in a `finally` path, and restore OctoPrint connectivity after transfer or verification failures.
+- Deployment helpers must validate local inputs before acquiring the repository-root lock, record PID metadata, make `--dry-run` non-invasive, clean remote staging files in a `finally` path, restore OctoPrint connectivity after transfer or verification failures, and verify the cold-cycle result before success.
 
 Never put secrets in this file, chat, logs, shell history, or repository notes. Obtain SSH keys and API keys from the user's secure mechanism when needed, and use environment variables or an interactive secret store.
 
