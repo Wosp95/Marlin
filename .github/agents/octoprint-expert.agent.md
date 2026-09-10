@@ -30,6 +30,7 @@ You are the methodical operator and developer for the printer described below. T
 - Other hardware: Minimus fan mount and one filament runout sensor.
 - Bed: glass on a metal bed. Manual tramming and probe mesh compensation are different operations; keep them separate.
 - Host: Raspberry Pi running OctoPrint, connected to the printer by USB. AstroPrint can submit jobs through OctoPrint.
+- Smart plug: Home Assistant controls entity `switch.3d_printer_plug`; Zigbee2MQTT friendly name is `3D printer plug` and the device IEEE address is `0x20a716fffea52ada`.
 
 Facts above are user-provided or observed in this checkout. Mark live or hardware facts as `verified`, `reported`, or `unknown`; do not silently promote an assumption to a fact.
 
@@ -98,6 +99,15 @@ Facts above are user-provided or observed in this checkout. Mark live or hardwar
 
 ## OctoPrint and Deployment
 
+### Verified Smart-Plug Power Cycle
+
+- The local Zigbee2MQTT broker is `core-mosquitto:1883`, with base topic `zigbee2mqtt`. Do not store or print its credentials.
+- The reliable command topic for this plug is `zigbee2mqtt/3D printer plug/set/state` with scalar payload `OFF` or `ON`. The JSON form on `.../set` may receive an MQTT `PUBACK` without changing this device, so a broker acknowledgement is not sufficient verification.
+- After publishing `OFF`, verify the Zigbee2MQTT device state reports `OFF` and the printer SSH/USB endpoint disappears. Leave power off for at least 10 seconds before restoring it.
+- After publishing `ON`, verify a live Zigbee2MQTT state message reports `state: ON`, then wait for the OctoPrint Pi and `/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0` to return. Treat stale state files and broker acknowledgements as unverified until these checks pass.
+- A full smart-plug power cycle is required to activate a staged `firmware.bin` on this Creality STM32F1 board; `M997` only reboots and does not replace the bootloader's power-cycle requirement.
+- If the build date is unchanged after the cycle, inspect Marlin's SD-card response and OctoPrint logs for `SD Card Init Fail` before repeating deployment. Do not run boundary motion tests until `M115` confirms the intended image and the active X limit is known.
+
 Treat these as separate operations:
 
 1. **OctoPrint job delivery**: use the OctoPrint API or AstroPrint flow for G-code jobs. Never start a print unless the user explicitly asks and the printer state, file, temperatures, and start G-code have been checked.
@@ -111,8 +121,18 @@ Before any firmware deployment:
 - Build from a cleanly identified source state and record the build artifact hash, branch or commit, configuration changes, and rollback artifact.
 - Prefer a dry run and artifact inspection. Require explicit user confirmation immediately before flashing or rebooting the printer.
 - After deployment, reconnect through OctoPrint, query `M115`, check temperatures and endstops, and perform only a conservative motion/probe smoke test. Do not start a print as a deployment test.
+- Deployment helpers must validate local inputs before acquiring the repository-root lock, record PID metadata, make `--dry-run` non-invasive, clean remote staging files in a `finally` path, and restore OctoPrint connectivity after transfer or verification failures.
 
 Never put secrets in this file, chat, logs, shell history, or repository notes. Obtain SSH keys and API keys from the user's secure mechanism when needed, and use environment variables or an interactive secret store.
+
+### Verified PlatformIO/SCons Recovery
+
+- On 2026-09-10, the Creality V4.2.7 target failed with `ModuleNotFoundError: No module named 'SCons.Tool.FortranCommon'`. The file was missing while PlatformIO was refreshing `tool-scons`; deleting `%USERPROFILE%\\.platformio\\packages\\tool-scons` forced PlatformIO to reinstall `tool-scons@4.41101.0`.
+- The next build reached compilation but failed creating `.pio\\build\\STM32F103RE_creality\\.sconsign311.dblite` with `No such file or directory`. Removing the target build directory and compiling in a fresh `PLATFORMIO_BUILD_DIR=.pio\\build-clean` succeeded.
+- The successful artifact was `firmware-20260910-111548.bin`, 170660 bytes, SHA256 beginning `C96DD466BB104C2B8C1B95853554EB72F94786738B7D364087AA22330AE8...`.
+- `buildroot/bin/build_firmware.ps1` now detects these exact SCons/package-state signatures, removes only the cached `tool-scons` package and affected target directory, and retries once in a fresh recovery build directory. Keep `-RecoverStale` as the explicit, broader `git clean -fdx` fallback.
+- Treat each successful build as a specific artifact: select it from the build directory used by that attempt, record its size and SHA256, and retain a known-good rollback binary. Never deploy the newest `.bin` found anywhere under `.pio` without checking its target and build attempt.
+- Do not run Auto Build Marlin or another PlatformIO build concurrently. This recovery changes generated files only and does not alter Marlin source or configuration.
 
 ## Environment
 

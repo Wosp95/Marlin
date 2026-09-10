@@ -10,6 +10,9 @@ import serial
 from MarlinBinaryProtocol import FileTransferProtocol, Protocol
 
 
+TARGET_FILENAME = "firmware.bin"
+
+
 def api_request(api_key, path, payload=None):
     data = None if payload is None else json.dumps(payload).encode()
     headers = {"X-Api-Key": api_key}
@@ -37,10 +40,32 @@ def read_api_key(config_path):
 def check_sd_card(port_name, baud):
     with serial.Serial(port_name, baudrate=baud, timeout=0.2, write_timeout=1) as port:
         port.write(b"M21\n")
-        time.sleep(0.5)
-        response = port.read(port.in_waiting).decode("utf-8", "replace")
+        deadline = time.time() + 3
+        response = ""
+        while time.time() < deadline:
+            response += port.read(port.in_waiting or 1).decode("utf-8", "replace")
+            if "SD card ok" in response or "SD Card Init Fail" in response:
+                break
     if "SD card ok" not in response:
         raise RuntimeError(f"SD card check failed: {response.strip()}")
+
+
+def check_firmware_file(port_name, baud):
+    with serial.Serial(port_name, baudrate=baud, timeout=0.2, write_timeout=1) as port:
+        port.write(b"M20\n")
+        deadline = time.time() + 3
+        response = ""
+        while time.time() < deadline:
+            response += port.read(port.in_waiting or 1).decode("utf-8", "replace")
+            if "End file list" in response or "SD Card Init Fail" in response:
+                break
+    if TARGET_FILENAME.lower() not in response.lower():
+        raise RuntimeError(f"{TARGET_FILENAME} was not listed on the SD card: {response.strip()}")
+
+
+def send_command(port_name, baud, command):
+    with serial.Serial(port_name, baudrate=baud, timeout=0.2, write_timeout=1) as port:
+        port.write(f"{command}\n".encode("ascii"))
 
 
 def main():
@@ -54,30 +79,38 @@ def main():
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
+    firmware = Path(args.firmware)
+    if not firmware.is_file():
+        raise RuntimeError(f"firmware file does not exist: {firmware}")
+    if args.dry_run:
+        print(json.dumps({"transfer": "skipped", "target": TARGET_FILENAME, "firmware": str(firmware), "dry_run": True}))
+        return 0
+
     api_key = read_api_key(args.octoprint_config)
     start_time = time.time()
     api_request(api_key, "connection", {"command": "disconnect"})
-    time.sleep(2)
-    check_sd_card(args.port, args.baud)
-
-    target = "firmware.bin"
     protocol = None
     try:
+        time.sleep(2)
+        check_sd_card(args.port, args.baud)
         protocol = Protocol(args.port, args.baud, 512, 0.0, 1000)
         protocol.connect()
         transfer = FileTransferProtocol(protocol)
-        if not transfer.copy(args.firmware, target, True, args.dry_run):
+        if not transfer.copy(str(firmware), TARGET_FILENAME, True, False):
             raise RuntimeError("binary transfer failed")
         protocol.disconnect()
-        protocol.send_ascii("M21")
+        protocol.shutdown()
+        protocol = None
         if not args.dry_run:
-            protocol.send_ascii("M997", True)
-        print(json.dumps({"transfer": "ok", "target": target, "dry_run": args.dry_run}))
+            check_firmware_file(args.port, args.baud)
+        send_command(args.port, args.baud, "M21")
+        if not args.dry_run:
+            send_command(args.port, args.baud, "M997")
+        print(json.dumps({"transfer": "ok", "target": TARGET_FILENAME, "dry_run": args.dry_run}))
     finally:
         if protocol:
             protocol.shutdown()
-
-    api_request(api_key, "connection", {"command": "connect"})
+        api_request(api_key, "connection", {"command": "connect"})
     deadline = time.time() + args.timeout
     while time.time() < deadline:
         time.sleep(2)
