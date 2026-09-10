@@ -36,12 +36,18 @@ try {
   $lockCreated = $true
   Set-Content $lockPath -Value "PID=$PID`r`nUTC=$([DateTime]::UtcNow.ToString('o'))" -Encoding ASCII
 
-  $otherBuilds = Get-CimInstance Win32_Process |
-    Where-Object {
-      $_.ProcessId -ne $PID -and
-      $_.CommandLine -and
-      $_.CommandLine -match '(?i)(platformio.*run|scons.*STM32F103RE_creality|STM32F103RE_creality.*scons)'
-    }
+  $otherBuilds = @()
+  if (Get-Command Get-CimInstance -ErrorAction SilentlyContinue) {
+    $otherBuilds = Get-CimInstance Win32_Process |
+      Where-Object {
+        $_.ProcessId -ne $PID -and
+        $_.CommandLine -and
+        $_.CommandLine -match '(?i)(platformio.*run|scons.*STM32F103RE_creality|STM32F103RE_creality.*scons)'
+      }
+  }
+  else {
+    Write-Warning 'Get-CimInstance is unavailable; relying on the build lock for overlap protection.'
+  }
   if ($otherBuilds) {
     Stop-Build 'Another PlatformIO/SCons build is active. Close it before starting this build.'
   }
@@ -65,22 +71,46 @@ try {
   $logPath = Join-Path $logDirectory ("build-{0}.log" -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
 
   function Invoke-FirmwareBuild {
-    & $pio run --silent -e $Environment 2>&1 | Tee-Object -FilePath $logPath
-    return $LASTEXITCODE
+    param([string]$BuildDirectory)
+    $previousBuildDirectory = $env:PLATFORMIO_BUILD_DIR
+    $rawOutputPath = "$logPath.out"
+    $rawErrorPath = "$logPath.err"
+    if ($BuildDirectory) { $env:PLATFORMIO_BUILD_DIR = $BuildDirectory }
+    try {
+      Remove-Item $rawOutputPath,$rawErrorPath -Force -ErrorAction SilentlyContinue
+      $process = Start-Process -FilePath $pio -ArgumentList @('run', '--silent', '-e', $Environment) -WorkingDirectory $repoRoot -RedirectStandardOutput $rawOutputPath -RedirectStandardError $rawErrorPath -Wait -PassThru
+      @(Get-Content $rawOutputPath,$rawErrorPath -ErrorAction SilentlyContinue) | Tee-Object -FilePath $logPath | Out-Host
+      $buildExitCode = $process.ExitCode
+    }
+    finally {
+      $env:PLATFORMIO_BUILD_DIR = $previousBuildDirectory
+      Remove-Item $rawOutputPath,$rawErrorPath -Force -ErrorAction SilentlyContinue
+    }
+    return $buildExitCode
   }
 
-  $exitCode = Invoke-FirmwareBuild
-  if ($exitCode -ne 0 -and $RecoverStale -and (Select-String -Path $logPath -Pattern '\.scons311\.dblite|missing|not found|No such file' -Quiet)) {
-    Write-Warning 'The build failed with a stale generated-state symptom; cleaning ignored state and retrying once.'
+  $buildDirectory = Join-Path $repoRoot '.pio\build'
+  $exitCode = Invoke-FirmwareBuild $buildDirectory
+  $staleStateError = Select-String -Path $logPath -Pattern '\.scons311\.dblite|SCons\.Tool\.FortranCommon|No module named .SCons|No such file or directory' -Quiet
+  if ($exitCode -ne 0 -and $staleStateError) {
+    $recoveryDirectory = Join-Path $repoRoot ".pio\build-recovery-$Environment"
+    Write-Warning 'The build hit a recoverable PlatformIO/SCons state error; rebuilding with fresh generated state.'
+    Remove-Item (Join-Path $env:USERPROFILE '.platformio\packages\tool-scons') -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item (Join-Path $repoRoot ".pio\build\$Environment") -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item $recoveryDirectory -Recurse -Force -ErrorAction SilentlyContinue
+    $exitCode = Invoke-FirmwareBuild $recoveryDirectory
+  }
+  if ($exitCode -ne 0 -and $RecoverStale) {
+    Write-Warning 'The targeted recovery failed; cleaning ignored state and retrying once.'
     & git clean -fdx -e buildroot/bin/build_firmware.ps1
     if ($LASTEXITCODE -ne 0) { Stop-Build 'git clean -fdx failed; no retry was attempted.' }
-    $exitCode = Invoke-FirmwareBuild
+    $exitCode = Invoke-FirmwareBuild $buildDirectory
   }
   if ($exitCode -ne 0) {
     Stop-Build "PlatformIO failed with exit code $exitCode. See $logPath"
   }
 
-  $artifact = Get-ChildItem (Join-Path $repoRoot ".pio\build\$Environment") -Filter '*.bin' |
+  $artifact = Get-ChildItem (Join-Path $repoRoot '.pio') -Recurse -Filter '*.bin' |
     Sort-Object LastWriteTime -Descending | Select-Object -First 1
   if (-not $artifact) {
     Stop-Build 'PlatformIO returned success but no firmware .bin was found.'
