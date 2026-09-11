@@ -1964,15 +1964,15 @@
 // @section geometry
 
 // The size of the printable area
-#define X_BED_SIZE 280
-#define Y_BED_SIZE 220
+#define X_BED_SIZE 234
+#define Y_BED_SIZE 234
 
 // Travel limits (linear=mm, rotational=°) after homing, corresponding to endstop positions.
 #define X_MIN_POS 0
 #define Y_MIN_POS 0
 #define Z_MIN_POS 0
 #define X_MAX_POS 280
-#define Y_MAX_POS 220
+#define Y_MAX_POS 234
 #define Z_MAX_POS 220
 //#define I_MIN_POS 0
 //#define I_MAX_POS 50
@@ -2309,6 +2309,12 @@
   #define MESH_INSET 1              // Set Mesh bounds as an inset region of the bed
   #define GRID_MAX_POINTS_X 10      // Don't use more than 15 points per axis, implementation limited.
   #define GRID_MAX_POINTS_Y GRID_MAX_POINTS_X
+
+  // Keep the CR Touch clear of the front and rear bed clips.
+  #define MESH_MIN_X 1
+  #define MESH_MAX_X 233
+  #define MESH_MIN_Y 12
+  #define MESH_MAX_Y 222
 
   //#define UBL_HILBERT_CURVE       // Use Hilbert distribution for less travel when probing multiple points
 

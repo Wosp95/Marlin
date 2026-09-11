@@ -110,6 +110,13 @@ Facts above are user-provided or observed in this checkout. Mark live or hardwar
 - Verify the newest post-cycle `Firmware info line` or `M115`, not transfer success, an MQTT acknowledgement, an SD listing, or `M997` alone. The expected compiler date must change before declaring deployment successful.
 - If the build date is unchanged after the cycle, inspect Marlin's SD-card response and OctoPrint logs for `SD Card Init Fail` before repeating deployment. Do not run boundary motion tests until `M115` confirms the intended image and the active X limit is known.
 
+### Verified BFT Post-Transfer Check Bug (fixed 2026-09-11)
+
+- With `CUSTOM_FIRMWARE_UPLOAD` enabled (this board's `Configuration_adv.h` always enables it alongside `BINARY_FILE_TRANSFER`), plain `M20` never lists `.BIN` files — see `Marlin/src/gcode/sd/M20.cpp`. Only `M20 F` lists them. `deploy_remote.py`'s `remove_firmware_files` already knew this, but `check_firmware_file` sent plain `M20` and always reported "file not listed" even though the BFT transfer succeeded (0 errors). This is a client-script bug, not a hardware or SD-card fault; do not diagnose it as "No media"/SD flakiness. Fixed by sending `M20 F` in `check_firmware_file`.
+- The plain `STM32F103RE_creality` PlatformIO environment (built by `buildroot/bin/build_firmware.ps1`) already has `BINARY_FILE_TRANSFER`/`CUSTOM_FIRMWARE_UPLOAD` enabled in this repo's `Configuration_adv.h`, so the `_xfer`-suffixed environment is not strictly required for BFT deploys to work here; still prefer `_xfer` if `docs/RemoteFirmwareDeployment.md` is updated to require it for other reasons.
+- A stuck/occupied terminal session that is mid-command should never receive new keystrokes (they get consumed as spurious input, e.g. into an SSH password prompt or a still-running remote process). Use a separate terminal to poll `.octoprint_run.lock` / `Get-Process` for progress instead of typing into a busy one.
+- 2026-09-11 successful end-to-end deploy: `firmware-20260911-102344.bin` (SHA256 `ced235b8bd64b18c6888876c04d7f7ea8f44de63c40ee1c99b821811eeeb77`) deployed via `deploy_firmware.py --power-cycle`; verified by `Firmware info line` changing from `Sep 10 2026 21:18:29` to `Sep 11 2026 10:22:47` and the Home Assistant plug's `last_changed` timestamp matching the power-cycle time.
+
 Treat these as separate operations:
 
 1. **OctoPrint job delivery**: use the OctoPrint API or AstroPrint flow for G-code jobs. Never start a print unless the user explicitly asks and the printer state, file, temperatures, and start G-code have been checked.

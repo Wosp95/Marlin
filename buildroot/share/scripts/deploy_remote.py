@@ -52,9 +52,10 @@ def check_sd_card(port_name, baud):
 
 
 def check_firmware_file(port_name, baud, filename):
+    # With CUSTOM_FIRMWARE_UPLOAD, plain M20 hides .BIN files; M20 F is required to list them.
     with serial.Serial(port_name, baudrate=baud, timeout=0.2, write_timeout=1) as port:
         port.reset_input_buffer()
-        port.write(b"M20\r\n")
+        port.write(b"M20 F\n")
         deadline = time.time() + 8
         response = ""
         while time.time() < deadline:
@@ -64,6 +65,19 @@ def check_firmware_file(port_name, baud, filename):
     if filename.lower() not in response.lower():
         raise RuntimeError(f"{filename} was not listed on the SD card: {response.strip()}")
 
+def wait_for_firmware_file(port_name, baud, filename, attempts=6, delay=2.0):
+    # After BFT closes a file, the directory entry can take a moment to flush;
+    # M21 (re-mount) plus a short settle delay makes it visible to M20.
+    last_error = None
+    for _ in range(attempts):
+        try:
+            check_sd_card(port_name, baud)
+            check_firmware_file(port_name, baud, filename)
+            return
+        except RuntimeError as error:
+            last_error = error
+            time.sleep(delay)
+    raise last_error
 
 def send_command(port_name, baud, command):
     with serial.Serial(port_name, baudrate=baud, timeout=0.2, write_timeout=1) as port:
@@ -127,6 +141,7 @@ def main():
         time.sleep(4)
         check_sd_card(args.port, args.baud)
         remove_firmware_files(args.port, args.baud)
+        check_sd_card(args.port, args.baud)
         protocol = Protocol(args.port, args.baud, 512, 0.0, 1000)
         protocol.connect()
         transfer = FileTransferProtocol(protocol)
@@ -135,9 +150,9 @@ def main():
         protocol.disconnect()
         protocol.shutdown()
         protocol = None
-        send_command(args.port, args.baud, "M21")
+        # BFT's directory entry can take a moment to flush; retry M21+M20 with a settle delay.
         if not args.dry_run:
-            check_firmware_file(args.port, args.baud, target_filename)
+            wait_for_firmware_file(args.port, args.baud, target_filename)
         if not args.dry_run:
             send_command(args.port, args.baud, "M997")
         print(json.dumps({"transfer": "ok", "target": target_filename, "dry_run": args.dry_run}))
